@@ -1,0 +1,89 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+#include <LiquidCrystal.h>
+
+// GPS module connection (RX=D6, TX=D7)
+SoftwareSerial ss(D6, D7);
+TinyGPSPlus gps;
+
+// Initialize the LCD (using 6 pins: RS, E, D4, D5, D6, D7)
+LiquidCrystal lcd(D4, D3, D2, D1, D0, D5);
+
+
+// Destination coordinates (example)
+float dest_lat = -33.9249;  // Cape Town latitude
+float dest_long = 18.4241;  // Cape Town longitude
+
+// Earth's radius in kilometers
+const float R = 6371;
+
+void setup() {
+  Serial.begin(115200);
+  ss.begin(9600);
+
+  // Initialize LCD
+  lcd.begin(16, 2);  // Set the LCD to 16 columns and 2 rows
+  lcd.setCursor(0, 0);
+  lcd.print("GPS Navigation");
+
+  delay(2000);
+}
+
+void loop() {
+  while (ss.available() > 0) {
+    gps.encode(ss.read());
+  }
+
+  if (gps.location.isUpdated()) {
+    float curr_lat = gps.location.lat();
+    float curr_long = gps.location.lng();
+
+    // Calculate distance and bearing
+    float distance = calculateDistance(curr_lat, curr_long, dest_lat, dest_long);
+    float bearing = calculateBearing(curr_lat, curr_long, dest_lat, dest_long);
+
+    // Display data on HD44780 LCD
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Dist: ");
+    lcd.print(distance, 2);
+    lcd.print(" km");
+    lcd.setCursor(0, 1);
+    lcd.print("Bear: ");
+    lcd.print(bearing, 2);
+    lcd.print(" deg");
+
+    delay(1000);  // Update every second
+  }
+}
+
+// Function to calculate distance using Haversine formula
+float calculateDistance(float lat1, float long1, float lat2, float long2) {
+  float dLat = radians(lat2 - lat1);
+  float dLon = radians(long2 - long1);
+
+  lat1 = radians(lat1);
+  lat2 = radians(lat2);
+
+  float a = sin(dLat / 2) * sin(dLat / 2) +
+            cos(lat1) * cos(lat2) *
+            sin(dLon / 2) * sin(dLon / 2);
+  float c = 2 * atan2(sqrt(a), sqrt(1 - a));
+  float distance = R * c;
+  return distance;
+}
+
+// Function to calculate bearing
+float calculateBearing(float lat1, float long1, float lat2, float long2) {
+  float dLon = radians(long2 - long1);
+  lat1 = radians(lat1);
+  lat2 = radians(lat2);
+
+  float y = sin(dLon) * cos(lat2);
+  float x = cos(lat1) * sin(lat2) -
+            sin(lat1) * cos(lat2) * cos(dLon);
+  float bearing = atan2(y, x);
+  bearing = degrees(bearing);
+  bearing = fmod((bearing + 360), 360);
+  return bearing;
+}
